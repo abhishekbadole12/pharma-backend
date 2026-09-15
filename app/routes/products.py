@@ -1,3 +1,6 @@
+import re
+from urllib.parse import parse_qs, urlparse
+
 from flask import Blueprint, request, jsonify, g
 from bson import ObjectId
 from slugify import slugify
@@ -9,6 +12,21 @@ from app.utils.helpers import serialize_doc, paginate, utc_now
 from app.utils.storage import get_storage, allowed_file, ALLOWED_IMAGE_EXTENSIONS
 
 products_bp = Blueprint('products', __name__)
+
+
+def google_drive_image_url(value):
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in ('http', 'https') or parsed.netloc not in ('drive.google.com', 'www.drive.google.com'):
+        return None
+
+    file_id = parse_qs(parsed.query).get('id', [None])[0]
+    if not file_id:
+        match = re.search(r'/file/d/([^/]+)', parsed.path)
+        file_id = match.group(1) if match else None
+    if not file_id:
+        return None
+
+    return f'https://drive.google.com/uc?export=view&id={file_id}'
 
 
 def serialize_product(product):
@@ -218,8 +236,16 @@ def upload_product_image(product_id):
     if not allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS):
         return jsonify({'error': 'Invalid file type'}), 400
 
-    storage = get_storage()
-    url = storage.save(file, 'products')
+    try:
+        storage = get_storage()
+        url = storage.save(file, 'products')
+    except Exception:
+        current_app.logger.exception('Product image upload failed')
+        return jsonify({'error': 'Image storage is not configured'}), 503
+
+    if not url:
+        return jsonify({'error': 'Image upload failed'}), 502
+
     is_thumbnail = request.form.get('is_thumbnail') == 'true'
 
     update = {'$push': {'images': url}, '$set': {'updated_at': utc_now()}}
@@ -228,6 +254,26 @@ def upload_product_image(product_id):
 
     db.products.update_one({'_id': ObjectId(product_id)}, update)
     return jsonify({'url': url, 'message': 'Image uploaded'})
+
+
+@products_bp.route('/<product_id>/images', methods=['POST'])
+@admin_required
+def add_product_image_url(product_id):
+    product = db.products.find_one({'_id': ObjectId(product_id)})
+    if not product:
+        return jsonify({'error': 'Product not found'}), 404
+
+    data = request.get_json() or {}
+    image_url = google_drive_image_url(data.get('url', ''))
+    if not image_url:
+        return jsonify({'error': 'Please provide a valid Google Drive image share link'}), 400
+
+    update = {'$push': {'images': image_url}, '$set': {'updated_at': utc_now()}}
+    if data.get('is_thumbnail') or not product.get('thumbnail'):
+        update['$set']['thumbnail'] = image_url
+    db.products.update_one({'_id': ObjectId(product_id)}, update)
+
+    return jsonify({'url': image_url, 'message': 'Image link added'}), 201
 
 
 @products_bp.route('/<product_id>/images', methods=['DELETE'])

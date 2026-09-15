@@ -10,6 +10,18 @@ from app.services.auth_service import AuthService
 from app.utils.helpers import utc_now
 
 
+def build_product_media(index):
+    media = [
+        'https://images.unsplash.com/photo-1584515933487-779824d29309?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1607619056574-7b8d0f4dbb66?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1550572017-6d0d7d3dffe1?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1523398002811-999ca3a4b9d2?auto=format&fit=crop&w=900&q=80',
+    ]
+    selected = media[index % len(media)]
+    return [selected, media[(index + 1) % len(media)]]
+
+
 def seed():
     app = create_app()
 
@@ -150,7 +162,58 @@ def seed():
 
         print(f"  Created {len(categories_data)} categories")
 
-        print("  Products are managed through the admin portal")
+        medicines = [
+            ('Paracetamol 500mg', 'MED-PARA-500', 'Crocin', 25, 30, 500, False, 'Paracetamol 500mg', 'GSK Pharmaceuticals'),
+            ('Ibuprofen 400mg', 'MED-IBU-400', 'Brufen', 35, 45, 400, False, 'Ibuprofen 400mg', 'Abbott'),
+            ('Cetirizine 10mg', 'MED-CET-10', 'Zyrtec', 20, 28, 600, False, 'Cetirizine Hydrochloride 10mg', 'UCB Pharma'),
+            ('Omeprazole 20mg', 'MED-OME-20', 'Omez', 45, 60, 300, True, 'Omeprazole 20mg', "Dr. Reddy's"),
+            ('Metformin 500mg', 'MED-MET-500', 'Glycomet', 55, 70, 350, True, 'Metformin Hydrochloride 500mg', 'USV Limited'),
+            ('Azithromycin 500mg', 'MED-AZI-500', 'Azithral', 120, 150, 200, True, 'Azithromycin 500mg', 'Alembic Pharmaceuticals'),
+            ('Amlodipine 5mg', 'MED-AMLO-5', 'Amlip', 30, 40, 250, True, 'Amlodipine 5mg', 'Cipla'),
+            ('ORS Lemon Sachets', 'MED-ORS-01', 'Electral', 25, 30, 450, False, 'Oral Rehydration Salts', 'FDC Limited'),
+            ('Antacid Suspension  mint', 'MED-ANTI-170', 'Digene', 110, 135, 180, False, 'Antacid Suspension 170ml', 'Abbott'),
+            ('Povidone Iodine Solution', 'MED-POV-100', 'Betadine', 95, 120, 160, False, 'Povidone Iodine 10%', 'Win-Medicare'),
+        ]
+
+        medicines_category = category_ids['Medicines']
+        for index, (name, sku, brand, price, mrp, stock, prescription, composition, manufacturer) in enumerate(medicines):
+            if db.products.find_one({'sku': sku}):
+                continue
+            images = build_product_media(index)
+            db.products.insert_one({
+                'name': name,
+                'slug': slugify(name),
+                'sku': sku,
+                'category_id': medicines_category,
+                'subcategory': '',
+                'brand': brand,
+                'description': f'Quality {name} from {brand}.',
+                'short_description': f'{name} - {brand}',
+                'price': price,
+                'mrp': mrp,
+                'discount': round((1 - price / mrp) * 100, 1),
+                'stock_quantity': stock,
+                'low_stock_threshold': 20,
+                'images': images,
+                'thumbnail': images[0],
+                'tags': ['medicines', brand.lower()],
+                'product_type': 'PRESCRIPTION' if prescription else 'OTC',
+                'prescription_required': prescription,
+                'status': 'ACTIVE',
+                'featured': index < 3,
+                'best_seller': index < 2,
+                'composition': composition,
+                'manufacturer': manufacturer,
+                'dosage': 'As directed by physician',
+                'usage': 'Take as prescribed',
+                'warnings': 'Keep out of reach of children',
+                'storage': 'Store in a cool, dry place',
+                'expiry_info': 'Check packaging for expiry date',
+                'created_at': utc_now(),
+                'updated_at': utc_now(),
+            })
+
+        print('  Default medicines are configured')
 
         print("Seeding complete!")
 
