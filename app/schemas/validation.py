@@ -68,6 +68,7 @@ class CategorySchema(Schema):
 class AddressSchema(Schema):
     full_name = fields.Str(required=True)
     phone = fields.Str(required=True)
+    gst_number = fields.Str(load_default='')
     address = fields.Str(required=True)
     apartment = fields.Str(load_default='')
     city = fields.Str(required=True)

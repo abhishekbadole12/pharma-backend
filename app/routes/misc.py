@@ -51,7 +51,7 @@ def update_address(address_id):
     if not address:
         return jsonify({'error': 'Address not found'}), 404
     data = request.get_json()
-    allowed = ['full_name', 'phone', 'address', 'apartment', 'city', 'state', 'pincode', 'is_default']
+    allowed = ['full_name', 'phone', 'gst_number', 'address', 'apartment', 'city', 'state', 'pincode', 'is_default']
     update = {k: v for k, v in data.items() if k in allowed}
     if update.get('is_default'):
         db.addresses.update_many({'user_id': ObjectId(g.user_id)}, {'$set': {'is_default': False}})
