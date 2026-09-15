@@ -16,7 +16,12 @@ products_bp = Blueprint('products', __name__)
 
 def google_drive_image_url(value):
     parsed = urlparse(value.strip())
-    if parsed.scheme not in ('http', 'https') or parsed.netloc not in ('drive.google.com', 'www.drive.google.com'):
+    allowed_hosts = {
+        'drive.google.com',
+        'www.drive.google.com',
+        'drive.usercontent.google.com',
+    }
+    if parsed.scheme not in ('http', 'https') or parsed.netloc not in allowed_hosts:
         return None
 
     file_id = parse_qs(parsed.query).get('id', [None])[0]
@@ -25,6 +30,9 @@ def google_drive_image_url(value):
         file_id = match.group(1) if match else None
     if not file_id:
         return None
+
+    if parsed.netloc == 'drive.usercontent.google.com' and parsed.path == '/download':
+        return f'https://drive.usercontent.google.com/download?id={file_id}'
 
     return f'https://drive.google.com/thumbnail?id={file_id}&sz=w1200'
 
