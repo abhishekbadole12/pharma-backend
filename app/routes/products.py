@@ -31,10 +31,7 @@ def google_drive_image_url(value):
     if not file_id:
         return None
 
-    if parsed.netloc == 'drive.usercontent.google.com' and parsed.path == '/download':
-        return f'https://drive.usercontent.google.com/download?id={file_id}'
-
-    return f'https://drive.google.com/thumbnail?id={file_id}&sz=w1200'
+    return f'https://drive.usercontent.google.com/download?id={file_id}'
 
 
 def serialize_product(product):
