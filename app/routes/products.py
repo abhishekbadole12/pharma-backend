@@ -1,7 +1,8 @@
 import re
 from urllib.parse import parse_qs, urlparse
+from urllib.request import Request, urlopen
 
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, Response
 from bson import ObjectId
 from slugify import slugify
 from marshmallow import ValidationError
@@ -32,6 +33,29 @@ def google_drive_image_url(value):
         return None
 
     return f'https://drive.usercontent.google.com/download?id={file_id}'
+
+
+@products_bp.route('/drive-image/<file_id>', methods=['GET'])
+def proxy_drive_image(file_id):
+    if not re.fullmatch(r'[A-Za-z0-9_-]+', file_id):
+        return jsonify({'error': 'Invalid image id'}), 400
+
+    source_url = f'https://drive.usercontent.google.com/download?id={file_id}'
+    try:
+        request = Request(source_url, headers={'User-Agent': 'Pharma image proxy'})
+        with urlopen(request, timeout=15) as upstream:
+            content_type = upstream.headers.get_content_type()
+            if not content_type.startswith('image/'):
+                return jsonify({'error': 'Drive file is not an image'}), 415
+            image_data = upstream.read()
+    except Exception:
+        return jsonify({'error': 'Unable to load Drive image'}), 502
+
+    return Response(
+        image_data,
+        mimetype=content_type,
+        headers={'Cache-Control': 'public, max-age=3600'},
+    )
 
 
 def serialize_product(product):
